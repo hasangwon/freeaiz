@@ -1,8 +1,46 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Pretendard";
+  src: url("/fonts/pretendard/PretendardVariable.woff2") format("woff2");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Simple";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2307-1@1.1/Danjo-bold-Regular.woff2")
+    format("woff2");
+  font-weight: normal;
+  font-display: swap;
+}
+
+html,
+body,
+#__next {
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  height: 100dvh;
+  width: 100%;
+  min-width: 280px;
+  overflow: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Pretendard";
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+@theme {
+  --color-primary: #e26559;
+  --color-secondary: #ffe679;
 }
 
 @theme inline {
@@ -19,8 +57,14 @@
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.title-font {
+  font-family: "Simple";
+}
+
+.text-shadow {
+  text-shadow: 2px 2px 2px rgba(0, 0, 0, 0.1);
+}
+
+.swiper-pagination {
+  display: none;
 }
