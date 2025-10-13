@@ -131,7 +131,7 @@ const HomePage = () => {
   -d "${body}"`;
   }, [payload, apiKey]);
   return (
-    <div className="bg-red-100">
+    <div className="bg-white">
       <TextareaAutosize
         minRows={3}
         maxRows={10}
