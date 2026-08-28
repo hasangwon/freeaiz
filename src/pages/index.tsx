@@ -1,9 +1,10 @@
 import HomePage from "@/components/home/HomePage";
-import Image from "next/image";
+import Seo from "@/components/common/Seo";
 
 export default function Home() {
   return (
     <>
+      <Seo />
       <HomePage />
     </>
   );

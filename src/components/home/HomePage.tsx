@@ -1,429 +1,160 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/router";
 import TextareaAutosize from "react-textarea-autosize";
+import HordeStatusBar from "./HordeStatusBar";
+import RecentCreations from "./RecentCreations";
+import Button from "@/components/ui/Button";
+import { EXAMPLE_PROMPTS } from "@/components/create/PromptComposer";
 
-type ImageParams = {
-  sampler_name?: string; // 예: "k_euler_a"
-  cfg_scale?: number; // 예: 7
-  height?: number; // 예: 768
-  width?: number; // 예: 1024
-  steps?: number; // 예: 30
-  n?: number; // 생성 이미지 개수
-  seed?: number; // 고정 시드(선택)
-  seed_variation?: number; // 시드 변이(선택)
-  clip_skip?: number; // 예: 2
-  hires_fix?: boolean; // 업스케일/2패스 최적화
-  karras?: boolean; // 스케줄러 옵션
-  tiling?: boolean; // 타일링(선택)
-  // 필요 시 추가 파라미터를 더 선언
-};
-
-type HordeImageRequest = {
-  // 공식 SDK 모델명들 참고(ImageGenerateAsyncRequest)
-  prompt: string;
-  negative_prompt?: string;
-  models?: string[]; // ["AlbedoBase XL (SDXL)"] 등
-  params?: ImageParams;
-  nsfw?: boolean; // NSFW 허용 여부
-  censor_nsfw?: boolean; // 서버 측 NSFW 검열 여부(문서상 존재)
-  r2?: boolean; // R2 저장소 사용 여부
-  shared?: boolean; // 공유 여부
-  replacement_filter?: boolean; // 금칙어/치환 필터
-  trusted_workers?: boolean; // 신뢰 워커만
-  slow_workers?: boolean; // 느린 워커 허용
-  allow_downgrade?: boolean; // (문서에서 의미 명확히 확인 못함)
-  // source_image, source_mask 등 img2img 관련도 공식 SDK에 존재
-};
-
-const SAMPLERS = [
-  "k_euler_a",
-  "k_euler",
-  "k_lms",
-  "k_dpm_2",
-  "k_dpm_2_a",
-  "k_dpmpp_2m",
-  "k_dpmpp_2s_a",
-  "k_heun",
+const STEPS = [
+  {
+    emoji: "✍️",
+    title: "프롬프트를 적는다",
+    body: "그리고 싶은 장면을 문장으로 설명하면 됩니다.",
+  },
+  {
+    emoji: "⏳",
+    title: "대기열에 올라간다",
+    body: "전 세계 사용자가 내어 준 GPU가 순서대로 요청을 처리합니다.",
+  },
+  {
+    emoji: "🖼️",
+    title: "이미지를 받는다",
+    body: "완성된 이미지는 이 브라우저에 자동으로 보관됩니다.",
+  },
 ];
-const HomePage = () => {
-  const [apiKey, setApiKey] = useState(""); // "0000000000" (가장 낮은 우선순위)
-  const [models, setModels] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
 
-  // 기본값: 질문에 준 예시와 유사
+export default function HomePage() {
+  const router = useRouter();
   const [prompt, setPrompt] = useState("");
-  const [negativePrompt, setNegativePrompt] = useState("");
 
-  const [params, setParams] = useState<ImageParams>({
-    sampler_name: "k_euler_a",
-    cfg_scale: 7,
-    height: 768,
-    width: 1024,
-    steps: 30,
-    n: 1,
-    seed_variation: 1,
-    clip_skip: 2,
-    hires_fix: true,
-    karras: true,
-  });
-
-  const [flags, setFlags] = useState({
-    nsfw: false,
-    censor_nsfw: false,
-    r2: true,
-    shared: false,
-    replacement_filter: true,
-    trusted_workers: false,
-    slow_workers: true,
-    allow_downgrade: true, // ⚠️ 공식 문서에서 의미를 못 찾음(아래 주석 참고)
-  });
-
-  // 활성 모델 목록 불러오기(공식 엔드포인트 /v2/status/models)
-  useEffect(() => {
-    fetch("https://aihorde.net/api/v2/status/models")
-      .then((r) => r.json())
-      .then((list) => {
-        // list: [{name: "AlbedoBase XL (SDXL)", ...}, ...] 형태
-        const names = Array.isArray(list)
-          ? list.map((m: any) => m.name).filter(Boolean)
-          : [];
-        setModels(names);
-        // 초깃값: AlbedoBase XL (SDXL)가 있으면 선택
-        if (names.includes("AlbedoBase XL (SDXL)")) {
-          setSelectedModels(["AlbedoBase XL (SDXL)"]);
-        }
-      })
-      .catch(() => {
-        // 실패 시 하드코딩 폴백
-        setModels(["AlbedoBase XL (SDXL)", "Deliberate", "Realistic Vision"]);
-      });
-  }, []);
-
-  const payload: HordeImageRequest = useMemo(() => {
-    const base: HordeImageRequest = {
-      prompt,
-      negative_prompt: negativePrompt || undefined,
-      models: selectedModels.length ? selectedModels : undefined,
-      params,
-      ...flags,
-    };
-    return base;
-  }, [prompt, negativePrompt, selectedModels, params, flags]);
-
-  // 실제 요청 대신 미리보기만
-  const [preview, setPreview] = useState("");
-  const handlePreview = () => {
-    setPreview(JSON.stringify(payload, null, 2));
+  const start = () => {
+    const trimmed = prompt.trim();
+    router.push(
+      trimmed ? `/create?prompt=${encodeURIComponent(trimmed)}` : "/create"
+    );
   };
 
-  // 선택 핸들러들
-  const updateParam = <K extends keyof ImageParams>(k: K, v: ImageParams[K]) =>
-    setParams((p) => ({ ...p, [k]: v }));
-
-  const toggleFlag = (k: keyof typeof flags) =>
-    setFlags((f) => ({ ...f, [k]: !f[k] }));
-
-  // 샘플 curl
-  const curl = useMemo(() => {
-    const body = JSON.stringify(payload).replaceAll('"', '\\"');
-    return `curl -X POST "https://aihorde.net/api/v2/generate/async" \\
-  -H "Content-Type: application/json" \\
-  -H "apikey: ${apiKey || "0000000000"}" \\
-  -d "${body}"`;
-  }, [payload, apiKey]);
   return (
-    <div className="bg-white">
-      <TextareaAutosize
-        minRows={3}
-        maxRows={10}
-        placeholder="프롬프트를 입력하세요..."
-        className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />{" "}
-      <main className="mx-auto max-w-[480px] p-4 space-y-4">
-        <h1 className="text-xl font-bold">AI Horde 이미지 생성(폼 데모)</h1>
+    <main className="flex-1">
+      {/* 히어로 */}
+      <section className="space-y-5 bg-gradient-to-b from-secondary/40 to-white px-4 pb-8 pt-8">
+        <div className="space-y-2 text-center">
+          <h1 className="text-[26px] font-extrabold leading-tight text-gray-900">
+            상상한 그림을,
+            <br />
+            <span className="bg-gradient-to-r from-primary to-rose-400 bg-clip-text text-transparent">
+              무료로 지금 바로
+            </span>
+          </h1>
+          <p className="text-sm leading-relaxed text-gray-600">
+            로그인도, 결제도, GPU도 필요 없습니다.
+            <br />
+            문장 하나면 충분합니다.
+          </p>
+        </div>
 
-        {/* API Key */}
-        <section className="space-y-2">
-          <label className="block text-sm font-semibold">API Key (선택)</label>
-          <input
-            className="w-full border rounded px-3 py-2 text-sm"
-            placeholder='없으면 "0000000000"(우선순위 가장 낮음)'
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-          <p className="text-xs text-gray-500">※ 공식 Quickstart 참고.</p>
-        </section>
+        <HordeStatusBar />
 
-        {/* Prompt */}
-        <section className="space-y-2">
-          <label className="block text-sm font-semibold">Prompt</label>
-          <TextareaAutosize
-            minRows={3}
-            className="w-full border rounded px-3 py-2 text-sm"
-            placeholder="무엇을 그리고 싶은지 자연어로 입력하세요."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <label className="block text-sm font-semibold">
-            Negative Prompt (선택)
-          </label>
+        {/* 빠른 시작 입력 */}
+        <div className="space-y-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
           <TextareaAutosize
             minRows={2}
-            className="w-full border rounded px-3 py-2 text-sm"
-            placeholder="배제하고 싶은 요소"
-            value={negativePrompt}
-            onChange={(e) => setNegativePrompt(e.target.value)}
-          />
-        </section>
-
-        {/* Models */}
-        <section className="space-y-2">
-          <label className="block text-sm font-semibold">
-            Model 선택(복수 가능)
-          </label>
-          <select
-            className="w-full border rounded px-3 py-2 text-sm"
-            multiple
-            value={selectedModels}
-            onChange={(e) => {
-              const opts = Array.from(e.target.selectedOptions).map(
-                (o) => o.value
-              );
-              setSelectedModels(opts);
+            maxRows={5}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              // 데스크톱에서는 Enter로 바로 시작, 줄바꿈은 Shift+Enter
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                start();
+              }
             }}
+            placeholder="예: 비 내리는 밤의 도쿄 거리, 네온 반사"
+            aria-label="프롬프트"
+            className="w-full resize-none bg-transparent px-1 py-1 text-sm leading-relaxed outline-none placeholder:text-gray-400"
+          />
+          <Button size="lg" fullWidth onClick={start}>
+            무료로 만들기 →
+          </Button>
+        </div>
+
+        {/* 예시 프롬프트 */}
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {EXAMPLE_PROMPTS.slice(0, 5).map((example) => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => setPrompt(example)}
+              className="shrink-0 cursor-pointer rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] text-gray-600 transition hover:border-primary hover:text-primary"
+            >
+              {example.length > 22 ? `${example.slice(0, 22)}…` : example}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* 최근 작업 */}
+      <RecentCreations />
+
+      {/* 동작 방식 */}
+      <section className="space-y-4 px-4 py-8">
+        <h2 className="text-center text-base font-extrabold text-gray-900">
+          어떻게 무료인가요?
+        </h2>
+        <p className="text-center text-xs leading-relaxed text-gray-600">
+          FREE AIz는{" "}
+          <a
+            href="https://aihorde.net"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="font-semibold text-primary underline underline-offset-2"
           >
-            {models.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500">
-            ※ 활성 모델은 /v2/status/models에서 조회.
-          </p>
-        </section>
+            AI Horde
+          </a>
+          의 공유 대기열 위에서 동작합니다. 자원을 기부한 사람들의 GPU가 순서대로
+          요청을 처리하기 때문에, 비용 대신 약간의 기다림이 필요합니다.
+        </p>
 
-        {/* Params */}
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold">파라미터(params)</h2>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs">sampler_name</label>
-              <select
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.sampler_name}
-                onChange={(e) => updateParam("sampler_name", e.target.value)}
+        <ol className="space-y-2">
+          {STEPS.map((step, index) => (
+            <li
+              key={step.title}
+              className="flex gap-3 rounded-2xl border border-gray-100 bg-gray-50/60 p-3.5"
+            >
+              <span
+                aria-hidden
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-base shadow-sm"
               >
-                {SAMPLERS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {step.emoji}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900">
+                  <span className="mr-1.5 text-primary">{index + 1}</span>
+                  {step.title}
+                </p>
+                <p className="text-xs leading-relaxed text-gray-600">
+                  {step.body}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
 
-            <div>
-              <label className="block text-xs">cfg_scale</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.cfg_scale ?? 7}
-                onChange={(e) =>
-                  updateParam("cfg_scale", Number(e.target.value))
-                }
-              />
-            </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-[11px] leading-relaxed text-amber-900">
+          <strong className="block pb-1">알아 두실 점</strong>
+          붐비는 시간대에는 대기가 길어질 수 있습니다. 고해상도를 끄거나 워커가
+          많은 모델을 고르면 훨씬 빨리 받아 볼 수 있어요. 생성된 이미지는 서버에
+          저장되지 않고 이 브라우저에만 보관됩니다.
+        </div>
 
-            <div>
-              <label className="block text-xs">width</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.width ?? 1024}
-                onChange={(e) => updateParam("width", Number(e.target.value))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs">height</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.height ?? 768}
-                onChange={(e) => updateParam("height", Number(e.target.value))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs">steps</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.steps ?? 30}
-                onChange={(e) => updateParam("steps", Number(e.target.value))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs">n (images)</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.n ?? 1}
-                onChange={(e) => updateParam("n", Number(e.target.value))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs">seed (선택)</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.seed ?? ""}
-                onChange={(e) =>
-                  updateParam(
-                    "seed",
-                    e.target.value === "" ? undefined : Number(e.target.value)
-                  )
-                }
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs">seed_variation (선택)</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.seed_variation ?? 1}
-                onChange={(e) =>
-                  updateParam("seed_variation", Number(e.target.value))
-                }
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs">clip_skip</label>
-              <input
-                type="number"
-                className="w-full border rounded px-2 py-1 text-sm"
-                value={params.clip_skip ?? 2}
-                onChange={(e) =>
-                  updateParam("clip_skip", Number(e.target.value))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 pt-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={params.hires_fix ?? false}
-                onChange={() =>
-                  updateParam("hires_fix", !(params.hires_fix ?? false))
-                }
-              />
-              hires_fix
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={params.karras ?? false}
-                onChange={() =>
-                  updateParam("karras", !(params.karras ?? false))
-                }
-              />
-              karras
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={params.tiling ?? false}
-                onChange={() =>
-                  updateParam("tiling", !(params.tiling ?? false))
-                }
-              />
-              tiling
-            </label>
-          </div>
-        </section>
-
-        {/* Flags */}
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold">플래그</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                "nsfw",
-                "censor_nsfw",
-                "r2",
-                "shared",
-                "replacement_filter",
-                "trusted_workers",
-                "slow_workers",
-                "allow_downgrade",
-              ] as (keyof typeof flags)[]
-            ).map((k) => (
-              <label key={k} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={flags[k]}
-                  onChange={() => toggleFlag(k)}
-                />
-                {k}
-              </label>
-            ))}
-          </div>
-          <p className="text-xs text-gray-500">
-            ※ `allow_downgrade`의 정확한 의미는 **공식 SDK/문서에서 확인하지
-            못했습니다**. 필요 시 제거하거나 기본값을 유지하세요.
-          </p>
-        </section>
-
-        {/* Preview / curl */}
-        <section className="space-y-2">
-          <button
-            className="px-3 py-2 border rounded text-sm"
-            onClick={handlePreview}
-          >
-            Payload 미리보기
-          </button>
-
-          {preview && (
-            <>
-              <h3 className="text-sm font-semibold pt-2">요청 JSON</h3>
-              <pre className="text-xs border rounded p-2 overflow-auto bg-gray-50">
-                {preview}
-              </pre>
-
-              <h3 className="text-sm font-semibold pt-2">curl 샘플</h3>
-              <pre className="text-xs border rounded p-2 overflow-auto bg-gray-50">
-                {curl}
-              </pre>
-
-              <details className="text-xs">
-                <summary className="cursor-pointer">fetch 예시(참고용)</summary>
-                <pre className="text-xs border rounded p-2 overflow-auto bg-gray-50">
-                  {`fetch("https://aihorde.net/api/v2/generate/async", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "apikey": "${apiKey || "0000000000"}"
-  },
-  body: JSON.stringify(${preview})
-});`}
-                </pre>
-              </details>
-            </>
-          )}
-        </section>
-
-        <footer className="text-xs text-gray-500">
-          실제 전송은 프로젝트 요구에 맞게 버튼을 분리해 처리하세요.
-        </footer>
-      </main>
-    </div>
+        <Link href="/create" className="block">
+          <Button size="lg" fullWidth variant="secondary">
+            바로 만들러 가기
+          </Button>
+        </Link>
+      </section>
+    </main>
   );
-};
-
-export default HomePage;
+}
