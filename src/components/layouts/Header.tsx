@@ -1,23 +1,36 @@
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+
+const MENUS = [
+  { title: "HOME", label: "홈", href: "/" },
+  { title: "CREATE", label: "이미지 만들기", href: "/create" },
+  { title: "MYCREATION", label: "내 작업", href: "/my-creation" },
+];
 
 export default function Header() {
+  const router = useRouter();
   const [isOpenNav, setIsOpenNav] = useState(false);
 
-  const MENUS = [
-    {
-      title: "HOME",
-      href: "/",
-    },
-    {
-      title: "CREATE",
-      href: "/create",
-    },
-    {
-      title: "MYCREATION",
-      href: "/my-creation",
-    },
-  ];
+  // 페이지를 옮기면 드로어를 닫는다 (뒤로가기 포함)
+  useEffect(() => {
+    const close = () => setIsOpenNav(false);
+    router.events.on("routeChangeComplete", close);
+    return () => router.events.off("routeChangeComplete", close);
+  }, [router.events]);
+
+  // 드로어가 열려 있는 동안 ESC로 닫기
+  useEffect(() => {
+    if (!isOpenNav) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpenNav(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpenNav]);
+
+  const isActive = (href: string) =>
+    href === "/" ? router.pathname === "/" : router.pathname.startsWith(href);
 
   return (
     <header className="bg-primary sticky top-0 z-50 w-full shadow">
@@ -27,12 +40,14 @@ export default function Header() {
           onClick={() => setIsOpenNav(true)}
           aria-expanded={isOpenNav}
           aria-controls="mobile-drawer"
+          aria-label="메뉴 열기"
           className="flex items-center justify-center w-12 cursor-pointer"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 64 64"
             className="h-[40px]"
+            aria-hidden
           >
             <g id="main">
               <path
@@ -85,7 +100,7 @@ export default function Header() {
       {isOpenNav && (
         <button
           type="button"
-          className="absolute inset-0 bg-black/40 z-[59]"
+          className="fixed inset-0 bg-black/40 z-[59]"
           aria-label="메뉴 닫기"
           onClick={() => setIsOpenNav(false)}
         />
@@ -99,11 +114,15 @@ export default function Header() {
         ].join(" ")}
         role="dialog"
         aria-modal="true"
+        aria-label="메뉴"
+        aria-hidden={!isOpenNav}
       >
-        <div className="border-b h-[4rem] flex items-center">MENU</div>
+        <div className="border-b h-[4rem] flex items-center font-bold text-gray-800">
+          MENU
+        </div>
         <button
           type="button"
-          className="absolute top-2 right-0 items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100"
+          className="absolute top-2 right-0 items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 cursor-pointer"
           aria-label="메뉴 닫기"
           onClick={() => setIsOpenNav(false)}
         >
@@ -117,16 +136,38 @@ export default function Header() {
           </svg>
         </button>
         <nav className="py-2 flex flex-col divide-y divide-gray-300">
-          {MENUS.map((m, idx) => (
-            <Link
-              key={idx}
-              href={m.href}
-              onClick={() => setIsOpenNav(false)}
-              className="border-b border-gray-300 w-full text-left px-4 py-6 text-sm hover:bg-gray-50 flex items-center justify-between"
-            >
-              <span className="text-base font-semibold">{m.title}</span>
-            </Link>
-          ))}
+          {MENUS.map((menu) => {
+            const active = isActive(menu.href);
+            return (
+              <Link
+                key={menu.href}
+                href={menu.href}
+                onClick={() => setIsOpenNav(false)}
+                aria-current={active ? "page" : undefined}
+                tabIndex={isOpenNav ? undefined : -1}
+                className={[
+                  "border-b border-gray-300 w-full text-left px-4 py-5 flex items-center justify-between transition",
+                  active ? "bg-primary/5" : "hover:bg-gray-50",
+                ].join(" ")}
+              >
+                <span>
+                  <span
+                    className={`block text-base font-semibold ${
+                      active ? "text-primary" : "text-gray-900"
+                    }`}
+                  >
+                    {menu.title}
+                  </span>
+                  <span className="block text-[11px] text-gray-500">
+                    {menu.label}
+                  </span>
+                </span>
+                {active && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
+                )}
+              </Link>
+            );
+          })}
         </nav>
       </aside>
     </header>

@@ -2,7 +2,7 @@
 
 @font-face {
   font-family: "Pretendard";
-  src: url("/fonts/pretendard/PretendardVariable.woff2") format("woff2");
+  src: url("/fonts/PretendardVariable.woff2") format("woff2");
   font-weight: 45 920;
   font-style: normal;
   font-display: swap;
@@ -67,4 +67,21 @@ body {
 
 .swiper-pagination {
   display: none;
+}
+
+/* 대기열 진행 막대: 진행률을 알 수 없을 때 좌우로 흐르는 애니메이션 */
+@keyframes queue-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[queue-slide_1\.4s_ease-in-out_infinite\] {
+    animation: none;
+    width: 100%;
+  }
 }

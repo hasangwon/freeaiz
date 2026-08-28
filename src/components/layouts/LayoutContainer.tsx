@@ -66,7 +66,7 @@ export default function LayoutContainer({ children }: LayoutContainerProps) {
       </div>
       <div
         ref={pageRef}
-        className="shadow-lg z-[1] relative overflow-y-auto flex flex-col justify-between h-full w-full min-w-[600px] max-w-[600px] bg-white"
+        className="shadow-lg z-[1] relative overflow-y-auto flex flex-col justify-between h-full w-full max-w-[600px] bg-white"
       >
         <Header />
         {children}
